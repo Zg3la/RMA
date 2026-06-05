@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "681871130162",
+    "project_id": "motogp-fantasy-78432",
+    "storage_bucket": "motogp-fantasy-78432.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:681871130162:android:418c3b48d7a3be18b7062b",
+        "android_client_info": {
+          "package_name": "com.motogp.fantasy"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "681871130162-pc3854ep3jlaaj1of84fh0n8te3q54t5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.motogp.fantasy",
+            "certificate_hash": "d8b9aabf19a5b9a21093d489af741055b4e1a9f1"
+          }
+        },
+        {
+          "client_id": "681871130162-ffc4o00qo28e07ghli62baq7epspbbts.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5IXNwyqm1vqqASatHSYxamX9uZZfvGv4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "681871130162-ffc4o00qo28e07ghli62baq7epspbbts.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
