@@ -2,7 +2,7 @@
 
 MotoGP Fantasy is a native Android app for creating a fantasy MotoGP team, following the race calendar, and comparing scores in leagues. The app was built with Kotlin and Jetpack Compose, while Firebase is used for authentication and storing app data.
 
-The main idea is simple: a user signs in with Google, selects riders and a constructor within a budget, joins or creates leagues, and follows race results through the season.
+The main idea is simple: a user signs in with Google, selects riders and a constructor within a budget, joins or creates leagues, and follows race results throughout the season.
 
 ## Features
 
@@ -12,6 +12,7 @@ The main idea is simple: a user signs in with Google, selects riders and a const
 - Public and private leagues
 - League joining with invite codes
 - Leaderboards and fantasy scoring
+- Rival overtake notifications in leagues
 - MotoGP race calendar
 - Race results overview
 - User profile screen
@@ -26,12 +27,12 @@ The main idea is simple: a user signs in with Google, selects riders and a const
 - Hilt
 - Firebase Authentication
 - Firebase Firestore
-- Retrofit 
+- Retrofit
 - Gradle Kotlin DSL
 
 ## Project Structure
 
-The Android project is inside the MotoGPFantasy folder.
+The Android project is inside the `MotoGPFantasy` folder.
 
 MotoGPFantasy/
   app/                 Android application module
@@ -42,13 +43,18 @@ Most of the source code is organized under:
 
 MotoGPFantasy/app/src/main/java/com/motogp/fantasy
 
-The main parts are split into data, repository, di, service, and ui packages.
+The main parts are split into `data`, `repository`, `di`, `service`, and `ui` packages.
 
 ## Running the App
 
-Open the MotoGPFantasy folder in Android Studio and run the app configuration.
+Open the `MotoGPFantasy` folder in Android Studio and run the app configuration.
 
 The project is intended to be run as a debug build. If Gradle asks for a JDK, use the Android Studio bundled JDK or JDK 17.
+
+To build the debug APK from the command line:
+
+cd MotoGPFantasy
+./gradlew.bat :app:assembleDebug
 
 The generated APK is located at:
 
@@ -58,6 +64,12 @@ A copy of the APK is also included here:
 
 MotoGPFantasy/apk/app-debug.apk
 
-## Notes
+## Firebase Notes
 
-Google Sign-In depends on the SHA-1 certificate configured in Firebase. The included APK is built with the current debug configuration. If the project is rebuilt on another computer, that computer's debug SHA-1 may need to be added in Firebase for Google Sign-In to work.
+Google Sign-In depends on the SHA-1 certificate configured in Firebase. The included APK is built with the current debug configuration.
+
+If the project is rebuilt on another computer, that computer's debug SHA-1 may need to be added in Firebase for Google Sign-In to work.
+
+The project includes the Firebase configuration file:
+
+MotoGPFantasy/app/google-services.json
