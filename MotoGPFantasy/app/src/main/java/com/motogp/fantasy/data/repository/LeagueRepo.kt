@@ -1,11 +1,11 @@
 package com.motogp.fantasy.data.repository
 
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import com.motogp.fantasy.data.CURRENT_SEASON
 import com.motogp.fantasy.data.model.League
 import com.motogp.fantasy.data.model.LeaderboardEntry
 import kotlinx.coroutines.channels.awaitClose
@@ -19,8 +19,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.random.Random
 
-private const val TAG = "LeagueRepo"
-
 @Singleton
 class LeagueRepo @Inject constructor(
     private val db: FirebaseFirestore,
@@ -29,10 +27,8 @@ class LeagueRepo @Inject constructor(
     private val uid get() = auth.currentUser?.uid ?: ""
 
     private fun getDisplayName(): String {
-        // Synchronous — use auth directly, no suspend needed for this
         val name = auth.currentUser?.displayName
         val email = auth.currentUser?.email
-        Log.d(TAG, "getDisplayName: displayName=$name email=$email uid=$uid")
         return when {
             !name.isNullOrBlank() -> name
             !email.isNullOrBlank() -> email.substringBefore("@")
@@ -46,7 +42,6 @@ class LeagueRepo @Inject constructor(
 
     private suspend fun writeScoreEntry(leagueId: String, rank: Int) {
         if (uid.isEmpty()) {
-            Log.e(TAG, "writeScoreEntry: uid is empty, cannot write")
             return
         }
         val displayName = getDisplayName()
@@ -59,19 +54,12 @@ class LeagueRepo @Inject constructor(
             "previousRank" to rank,
             "userId" to uid
         )
-        Log.d(TAG, "Writing score entry for $uid ($displayName) in league $leagueId")
-        try {
-            db.collection("leagues")
-                .document(leagueId)
-                .collection("scores")
-                .document(uid)
-                .set(data, SetOptions.merge())
-                .await()
-            Log.d(TAG, "Score entry written successfully")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to write score entry: ${e.message}", e)
-            throw e // rethrow so caller knows it failed
-        }
+        db.collection("leagues")
+            .document(leagueId)
+            .collection("scores")
+            .document(uid)
+            .set(data, SetOptions.merge())
+            .await()
     }
 
     fun myLeagues(): Flow<List<League>> = callbackFlow {
@@ -80,7 +68,6 @@ class LeagueRepo @Inject constructor(
             .whereArrayContains("memberIds", uid)
             .addSnapshotListener { snap, error ->
                 if (error != null) {
-                    Log.e(TAG, "myLeagues error: ${error.message}")
                     return@addSnapshotListener
                 }
                 val list = snap?.documents?.mapNotNull { doc ->
@@ -92,7 +79,7 @@ class LeagueRepo @Inject constructor(
                             isPublic = doc.getBoolean("isPublic") ?: false,
                             memberIds = (doc.get("memberIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
                             createdBy = doc.getString("createdBy") ?: "",
-                            season = (doc.getLong("season") ?: 2025L).toInt()
+                            season = (doc.getLong("season") ?: CURRENT_SEASON.toLong()).toInt()
                         )
                     } catch (e: Exception) { null }
                 } ?: emptyList()
@@ -115,7 +102,7 @@ class LeagueRepo @Inject constructor(
                             isPublic = true,
                             memberIds = (doc.get("memberIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
                             createdBy = doc.getString("createdBy") ?: "",
-                            season = (doc.getLong("season") ?: 2025L).toInt()
+                            season = (doc.getLong("season") ?: CURRENT_SEASON.toLong()).toInt()
                         )
                     } catch (e: Exception) { null }
                 } ?: emptyList()
@@ -125,20 +112,13 @@ class LeagueRepo @Inject constructor(
     }
 
     fun leaderboard(leagueId: String): Flow<List<LeaderboardEntry>> = callbackFlow {
-        Log.d(TAG, "Starting leaderboard listener for league $leagueId, uid=$uid")
         val sub = db.collection("leagues").document(leagueId)
             .collection("scores")
             .orderBy("totalPoints", Query.Direction.DESCENDING)
             .addSnapshotListener { snap, error ->
                 if (error != null) {
-                    Log.e(TAG, "Leaderboard error: ${error.message}")
-                    // If index error, try without orderBy as fallback
                     trySend(emptyList())
                     return@addSnapshotListener
-                }
-                Log.d(TAG, "Leaderboard snapshot: ${snap?.documents?.size} docs")
-                snap?.documents?.forEach { doc ->
-                    Log.d(TAG, "  doc: ${doc.id} -> displayName=${doc.getString("displayName")}")
                 }
                 CoroutineScope(Dispatchers.IO).launch {
                     val list = snap?.documents?.mapNotNull { doc ->
@@ -181,7 +161,6 @@ class LeagueRepo @Inject constructor(
                             ))
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error fetching missing users: ${e.message}")
                     }
 
                     trySend(list)
@@ -192,7 +171,6 @@ class LeagueRepo @Inject constructor(
 
     suspend fun createLeague(name: String, isPublic: Boolean): League {
         if (uid.isEmpty()) throw Exception("Not logged in")
-        Log.d(TAG, "Creating league: $name, uid=$uid")
         val code = (1..6).map { "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Random.nextInt(32)] }.joinToString("")
         val data = hashMapOf(
             "name" to name,
@@ -200,17 +178,15 @@ class LeagueRepo @Inject constructor(
             "isPublic" to isPublic,
             "memberIds" to listOf(uid),
             "createdBy" to uid,
-            "season" to 2025
+            "season" to CURRENT_SEASON
         )
         val ref = db.collection("leagues").add(data).await()
-        Log.d(TAG, "League created: ${ref.id}, now writing score entry")
         writeScoreEntry(ref.id, 1)
         return League(id = ref.id, name = name, code = code, isPublic = isPublic, memberIds = listOf(uid), createdBy = uid)
     }
 
     suspend fun joinLeague(code: String): Result<League> {
         return try {
-            Log.d(TAG, "Joining league with code: $code, uid=$uid")
             val snap = db.collection("leagues")
                 .whereEqualTo("code", code.uppercase())
                 .limit(1)
@@ -230,32 +206,26 @@ class LeagueRepo @Inject constructor(
                 db.collection("leagues").document(doc.id)
                     .update("memberIds", FieldValue.arrayUnion(uid)).await()
             }
-            Log.d(TAG, "Joined league ${doc.id}, writing score entry")
             writeScoreEntry(doc.id, memberIds.size + 1)
             Result.success(league)
         } catch (e: Exception) {
-            Log.e(TAG, "joinLeague failed: ${e.message}", e)
             Result.failure(e)
         }
     }
 
     suspend fun fixMyScoreEntries() {
         if (uid.isEmpty()) return
-        Log.d(TAG, "fixMyScoreEntries for uid=$uid")
         try {
             val leagues = db.collection("leagues")
                 .whereArrayContains("memberIds", uid)
                 .get().await()
-            Log.d(TAG, "Found ${leagues.documents.size} leagues to fix")
             for (doc in leagues.documents) {
                 try {
                     writeScoreEntry(doc.id, 1)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to fix entry for league ${doc.id}: ${e.message}")
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "fixMyScoreEntries failed: ${e.message}")
         }
     }
 

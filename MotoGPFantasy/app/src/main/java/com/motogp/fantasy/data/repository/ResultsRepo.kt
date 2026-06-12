@@ -1,16 +1,13 @@
 package com.motogp.fantasy.data.repository
 
-import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
+import com.motogp.fantasy.data.CURRENT_SEASON
 import com.motogp.fantasy.data.model.FirestoreResult
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private const val TAG = "ResultsRepo"
-private const val CURRENT_SEASON = 2026
 
 @Singleton
 class ResultsRepo @Inject constructor(
@@ -21,7 +18,6 @@ class ResultsRepo @Inject constructor(
             .whereEqualTo("season", season)
             .addSnapshotListener { snap, error ->
                 if (error != null) {
-                    Log.e(TAG, "Results error: ${error.message}")
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
@@ -43,7 +39,6 @@ class ResultsRepo @Inject constructor(
                         null
                     }
                 } ?: emptyList()
-                Log.d(TAG, "Got ${list.size} results from Firestore")
                 trySend(list.sortedByDescending { it.round })
             }
         awaitClose { sub.remove() }

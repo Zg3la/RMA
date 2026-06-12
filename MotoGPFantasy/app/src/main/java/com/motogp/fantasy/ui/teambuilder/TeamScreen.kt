@@ -21,13 +21,13 @@ import com.motogp.fantasy.data.model.Rider
 import com.motogp.fantasy.data.repository.ConstructorRepo
 import com.motogp.fantasy.data.repository.FantasyScoringRepo
 import com.motogp.fantasy.data.repository.RaceRepo
+import com.motogp.fantasy.data.repository.RaceWeekendSchedule
 import com.motogp.fantasy.data.repository.RiderRepo
 import com.motogp.fantasy.data.repository.TeamRepo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.time.Instant
 import javax.inject.Inject
 
 private const val BUDGET = 100.0
@@ -66,18 +66,18 @@ class TeamViewModel @Inject constructor(
     private val _tab = MutableStateFlow(0)
 
     private val _teamLocked = raceRepo.races.map { races ->
-        val today = LocalDate.now()
-        val nextRace = races.firstOrNull { it.status == "upcoming" || it.status == "live" }
-        var isLocked = false
-        if (nextRace != null) {
-            try {
-                val raceDate = LocalDate.parse(nextRace.date, DateTimeFormatter.ISO_LOCAL_DATE)
-                if (!today.isBefore(raceDate.minusDays(2)) && !today.isAfter(raceDate)) {
-                    isLocked = true
-                }
-            } catch (e: Exception) {}
-        }
-        isLocked
+        val now = Instant.now()
+        val nextRace = races.firstOrNull { it.status == "live" }
+            ?: races.firstOrNull { it.status == "upcoming" }
+            ?: return@map false
+        val sessions = RaceWeekendSchedule.sessionsFor(nextRace)
+        val lockStart = sessions.firstOrNull { it.type == "Free Practice 1" }
+            ?.let { RaceWeekendSchedule.sessionStartAtTrack(nextRace, it)?.toInstant() }
+            ?: return@map false
+        val unlockAfter = sessions.firstOrNull { it.type == "Race" }
+            ?.let { RaceWeekendSchedule.sessionStartAtTrack(nextRace, it)?.plusHours(6)?.toInstant() }
+
+        !now.isBefore(lockStart) && (unlockAfter == null || now.isBefore(unlockAfter))
     }
 
     val state: StateFlow<State> = combine(
@@ -153,7 +153,7 @@ fun TeamScreen(vm: TeamViewModel = hiltViewModel()) {
 
     LaunchedEffect(s.saved) {
         if (s.saved) {
-            scope.launch { snack.showSnackbar("Team saved to Firebase!") }
+            scope.launch { snack.showSnackbar("Team saved!") }
             vm.clearSaved()
         }
     }

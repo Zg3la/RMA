@@ -1,15 +1,13 @@
 package com.motogp.fantasy.data.repository
 
-import android.util.Log
+import com.motogp.fantasy.data.CURRENT_SEASON
 import com.motogp.fantasy.data.model.Race
 import com.motogp.fantasy.data.remote.SportsDbApi
 import com.motogp.fantasy.data.remote.SportsDbEvent
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val SPORTS_DB_TAG = "SportsDbResultsRepo"
 private const val MOTOGP_LEAGUE_ID = "4407"
-private const val CURRENT_SEASON = "2026"
 
 data class MainRaceResultRow(
     val position: Int,
@@ -38,12 +36,12 @@ class SportsDbResultsRepo @Inject constructor(
     }
 
     private suspend fun resultForRound(round: Int, searchCandidates: List<String>): MainRaceResult? {
-        resultCache[round]?.let { return it }
+        if (resultCache.containsKey(round)) return resultCache[round]
 
         return try {
             val event = seasonEvents().firstOrNull { it.round?.toIntOrNull() == round }
                 ?: searchCandidates.firstNotNullOfOrNull { candidate ->
-                    api.searchEvents(candidate, CURRENT_SEASON)
+                    api.searchEvents(candidate, CURRENT_SEASON.toString())
                         .allEvents()
                         .firstOrNull { it.isMainRace() && it.round?.toIntOrNull() == round }
                 }
@@ -68,7 +66,6 @@ class SportsDbResultsRepo @Inject constructor(
             resultCache[round] = result
             result
         } catch (e: Exception) {
-            Log.e(SPORTS_DB_TAG, "Unable to load round $round result: ${e.message}", e)
             null
         }
     }
@@ -76,7 +73,7 @@ class SportsDbResultsRepo @Inject constructor(
     private suspend fun seasonEvents(): List<SportsDbEvent> {
         mainRaceEvents?.let { return it }
 
-        val events = api.seasonEvents(MOTOGP_LEAGUE_ID, CURRENT_SEASON).events.orEmpty()
+        val events = api.seasonEvents(MOTOGP_LEAGUE_ID, CURRENT_SEASON.toString()).events.orEmpty()
         return events
             .filter { it.isMainRace() && it.round?.toIntOrNull() != null }
             .sortedBy { it.round?.toIntOrNull() ?: Int.MAX_VALUE }

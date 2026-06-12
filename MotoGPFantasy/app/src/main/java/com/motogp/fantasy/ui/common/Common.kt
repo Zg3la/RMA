@@ -7,6 +7,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.motogp.fantasy.service.RaceNotificationViewModel
 import com.motogp.fantasy.ui.calendar.CalendarScreen
 import com.motogp.fantasy.ui.dashboard.DashboardScreen
 import com.motogp.fantasy.ui.leagues.LeaguesScreen
@@ -34,6 +36,8 @@ fun ErrorScreen(msg: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScaffold(onSignOut: () -> Unit) {
+    hiltViewModel<RaceNotificationViewModel>()
+
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val current = entry?.destination?.route

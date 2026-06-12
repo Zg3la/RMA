@@ -12,10 +12,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.motogp.fantasy.di.AppModule
 import com.motogp.fantasy.data.repository.MainRaceResult
 import com.motogp.fantasy.data.model.Race
 import com.motogp.fantasy.data.model.User
@@ -23,15 +27,12 @@ import com.motogp.fantasy.data.repository.RaceRepo
 import com.motogp.fantasy.data.repository.SportsDbResultsRepo
 import com.motogp.fantasy.data.repository.UserRepo
 import com.motogp.fantasy.ui.common.LoadingScreen
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class DashboardViewModel @Inject constructor(
-    private val raceRepo: RaceRepo,
-    private val userRepo: UserRepo,
+class DashboardViewModel(
+    raceRepo: RaceRepo,
+    userRepo: UserRepo,
     private val sportsDbResultsRepo: SportsDbResultsRepo
 ) : ViewModel() {
 
@@ -100,11 +101,28 @@ class DashboardViewModel @Inject constructor(
     fun closeResult() {
         resultState.value = ResultState()
     }
+
+    companion object {
+        val Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                if (!modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
+                    throw IllegalArgumentException("Unknown ViewModel class")
+                }
+
+                return DashboardViewModel(
+                    raceRepo = RaceRepo(AppModule.motorsportApi(AppModule.rapidApiClient())),
+                    userRepo = UserRepo(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance()),
+                    sportsDbResultsRepo = SportsDbResultsRepo(AppModule.sportsDbApi(AppModule.sportsDbClient()))
+                ) as T
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(vm: DashboardViewModel = hiltViewModel()) {
+fun DashboardScreen(vm: DashboardViewModel = viewModel(factory = DashboardViewModel.Factory)) {
     val s by vm.state.collectAsStateWithLifecycle()
     if (s.loading) { LoadingScreen(); return }
 

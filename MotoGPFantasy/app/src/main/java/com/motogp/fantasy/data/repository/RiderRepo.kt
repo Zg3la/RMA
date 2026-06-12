@@ -37,5 +37,5 @@ class RiderRepo @Inject constructor(private val db: FirebaseFirestore) {
         awaitClose { sub.remove() }
     }
 
-    suspend fun refresh() { /* Firestore listener handles updates in real time */ }
+    suspend fun refresh() = Unit
 }

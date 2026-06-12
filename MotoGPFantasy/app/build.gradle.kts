@@ -34,12 +34,6 @@ android {
             (localProperties.getProperty("RAPIDAPI_KEY") ?: "").asBuildConfigString()
         )
     }
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-        }
-    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -47,6 +41,12 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
+}
+
+androidComponents {
+    beforeVariants(selector().all()) { variantBuilder ->
+        variantBuilder.enable = variantBuilder.buildType == "debug"
+    }
 }
 
 dependencies {
@@ -66,12 +66,9 @@ dependencies {
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
     implementation(libs.hilt.navigation)
-    implementation(libs.hilt.work)
-    kapt(libs.hilt.work.compiler)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.auth)
-    implementation(libs.firebase.messaging)
     implementation(libs.firebase.storage)
     implementation(libs.google.auth)
     implementation(libs.coroutines.android)
@@ -83,7 +80,6 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     kapt(libs.room.compiler)
-    implementation(libs.work.runtime)
     debugImplementation(libs.compose.ui.tooling)
 }
 kapt { correctErrorTypes = true }

@@ -2,8 +2,8 @@ package com.motogp.fantasy.data.repository
 
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
+import com.motogp.fantasy.data.CURRENT_SEASON
 import com.motogp.fantasy.data.model.Race
-import com.motogp.fantasy.data.model.RaceSession
 import com.motogp.fantasy.data.model.RoundDetail
 import com.motogp.fantasy.data.remote.MotorsportApi
 import kotlinx.coroutines.flow.Flow
@@ -16,7 +16,6 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val CURRENT_SEASON = 2026
 private const val MOTOGP_UNIQUE_STAGE_ID = 17
 
 private data class FallbackRace(
@@ -51,16 +50,6 @@ private val FALLBACK_CALENDAR_2026 = listOf(
     FallbackRace("2026_20", "Grand Prix of Qatar", "Lusail International Circuit", "Qatar", "2026-11-08", 20),
     FallbackRace("2026_21", "Grand Prix of Portugal", "Autodromo Internacional do Algarve", "Portugal", "2026-11-22", 21),
     FallbackRace("2026_22", "Grand Prix of Valencia", "Circuit Ricardo Tormo", "Spain", "2026-11-29", 22)
-)
-
-private fun defaultSessions(race: Race): List<RaceSession> = listOf(
-    RaceSession("Free Practice 1", race.date, "09:00", "Practice 1"),
-    RaceSession("Free Practice 2", race.date, "13:15", "Practice 2"),
-    RaceSession("Sprint Qualifying", race.date, "10:10", "Sprint Qualifying"),
-    RaceSession("Sprint Race", race.date, "15:00", "Sprint Race"),
-    RaceSession("Qualifying", race.date, "10:15", "Qualifying"),
-    RaceSession("Warm Up", race.date, "09:40", "Warm Up"),
-    RaceSession("MotoGP Race", race.date, "14:00", "Race")
 )
 
 @Singleton
@@ -236,7 +225,7 @@ class RaceRepo @Inject constructor(private val api: MotorsportApi) {
 
     fun getRoundDetail(race: Race): RoundDetail = RoundDetail(
         race = race,
-        sessions = defaultSessions(race),
+        sessions = RaceWeekendSchedule.sessionsFor(race),
         eventId = race.id
     )
 }

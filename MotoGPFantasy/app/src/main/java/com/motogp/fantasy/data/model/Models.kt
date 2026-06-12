@@ -1,5 +1,7 @@
 package com.motogp.fantasy.data.model
 
+import com.motogp.fantasy.data.CURRENT_SEASON
+
 data class Rider(
     val id: String = "",
     val name: String = "",
@@ -45,7 +47,7 @@ data class FirestoreResult(
     val raceWinner: String = "",
     val raceSecond: String = "",
     val raceThird: String = "",
-    val season: Int = 2025,
+    val season: Int = CURRENT_SEASON,
     val processed: Boolean = false
 )
 
@@ -54,7 +56,6 @@ data class User(
     val displayName: String = "",
     val email: String = "",
     val avatarUrl: String = "",
-    val fcmToken: String = "",
     val notifyRaceStart: Boolean = true,
     val notifyDeadline: Boolean = true,
     val notifyRivalOvertake: Boolean = true,
@@ -68,7 +69,7 @@ data class League(
     val isPublic: Boolean = false,
     val memberIds: List<String> = emptyList(),
     val createdBy: String = "",
-    val season: Int = 2025
+    val season: Int = CURRENT_SEASON
 )
 
 data class LeaderboardEntry(
@@ -79,14 +80,6 @@ data class LeaderboardEntry(
     val currentRank: Int = 0,
     val previousRank: Int = 0,
     val isCurrentUser: Boolean = false
-)
-
-data class FantasyTeam(
-    val userId: String = "",
-    val riderIds: List<String> = emptyList(),
-    val budgetUsed: Double = 0.0,
-    val season: Int = 2025,
-    val isLocked: Boolean = false
 )
 
 data class Constructor(

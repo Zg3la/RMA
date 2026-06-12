@@ -32,7 +32,6 @@ import javax.inject.Inject
 @HiltViewModel
 class AuthViewModel @Inject constructor(private val repo: AuthRepo) : ViewModel() {
 
-    // Exposed as StateFlow for collectAsStateWithLifecycle
     private val _loggedIn = MutableStateFlow(repo.isLoggedIn)
     val loggedIn: StateFlow<Boolean> = _loggedIn.asStateFlow()
 
@@ -52,6 +51,11 @@ class AuthViewModel @Inject constructor(private val repo: AuthRepo) : ViewModel(
             )
             _loading.value = false
         }
+    }
+
+    fun showError(message: String) {
+        _loading.value = false
+        _error.value = message
     }
 
     fun clearError() { _error.value = null }
@@ -74,14 +78,13 @@ fun AuthScreen(onSuccess: () -> Unit, vm: AuthViewModel = hiltViewModel()) {
                 val account = GoogleSignIn.getSignedInAccountFromIntent(result.data).getResult(ApiException::class.java)
                 vm.signIn(account)
             } catch (e: ApiException) {
-                // ApiException code 10 = developer_error = SHA-1 or client ID mismatch
                 val msg = when (e.statusCode) {
-                    10 -> "Config error: Check SHA-1 fingerprint and Web Client ID in Firebase"
+                    10 -> "Sign-in setup error. Please check app configuration."
                     12501 -> "Sign in cancelled"
-                    7 -> "Network error — check internet connection"
+                    7 -> "Network error - check internet connection"
                     else -> "Google Sign-In failed (code ${e.statusCode})"
                 }
-                // Show error by updating state via a workaround
+                vm.showError(msg)
             }
         }
     }
@@ -115,7 +118,6 @@ fun AuthScreen(onSuccess: () -> Unit, vm: AuthViewModel = hiltViewModel()) {
                         .requestEmail()
                         .build()
                     val client = GoogleSignIn.getClient(ctx, gso)
-                    // Sign out first to force account picker every time
                     client.signOut().addOnCompleteListener {
                         launcher.launch(client.signInIntent)
                     }

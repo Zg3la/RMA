@@ -1,6 +1,8 @@
 package com.motogp.fantasy.ui.calendar
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -18,66 +20,77 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
-import com.motogp.fantasy.data.model.FirestoreResult
 import com.motogp.fantasy.data.model.Race
 import com.motogp.fantasy.data.model.RoundDetail
 import com.motogp.fantasy.data.repository.RaceRepo
-import com.motogp.fantasy.data.repository.ResultsRepo
-import com.motogp.fantasy.data.repository.RiderRepo
+import com.motogp.fantasy.data.repository.RaceWeekendSchedule
+import com.motogp.fantasy.data.repository.SportsDbResultsRepo
 import com.motogp.fantasy.ui.common.LoadingScreen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
-private const val CURRENT_SEASON = 2026
+private enum class ScheduleTimeMode {
+    LocalTime,
+    YourTime
+}
 
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
     private val raceRepo: RaceRepo,
-    private val resultsRepo: ResultsRepo,
-    private val riderRepo: RiderRepo
+    private val sportsDbResultsRepo: SportsDbResultsRepo
 ) : ViewModel() {
 
     data class State(
         val races: List<Race> = emptyList(),
-        val results: List<FirestoreResult> = emptyList(),
+        val raceWinners: Map<Int, String> = emptyMap(),
         val loading: Boolean = true,
         val selectedDetail: RoundDetail? = null
     )
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
+    private val requestedWinnerRounds = mutableSetOf<Int>()
 
     init {
         viewModelScope.launch {
             raceRepo.refresh()
-            combine(raceRepo.races, resultsRepo.results(CURRENT_SEASON), riderRepo.riders()) { races, results, riders ->
-                val mappedResults = results.map { r ->
-                    r.copy(
-                        sprintWinner = riders.find { it.id == r.sprintWinner }?.name ?: r.sprintWinner,
-                        sprintSecond = riders.find { it.id == r.sprintSecond }?.name ?: r.sprintSecond,
-                        sprintThird = riders.find { it.id == r.sprintThird }?.name ?: r.sprintThird,
-                        raceWinner = riders.find { it.id == r.raceWinner }?.name ?: r.raceWinner,
-                        raceSecond = riders.find { it.id == r.raceSecond }?.name ?: r.raceSecond,
-                        raceThird = riders.find { it.id == r.raceThird }?.name ?: r.raceThird
-                    )
-                }
-                _state.update { it.copy(races = races, results = mappedResults, loading = false) }
-            }.collect()
+            raceRepo.races.collect { races ->
+                _state.update { it.copy(races = races, loading = false) }
+                loadRaceWinners(races)
+            }
         }
+    }
+
+    private fun loadRaceWinners(races: List<Race>) {
+        races
+            .filter { it.status == "finished" && requestedWinnerRounds.add(it.round) }
+            .forEach { race ->
+                viewModelScope.launch {
+                    val winner = sportsDbResultsRepo.resultForRace(race)
+                        ?.rows
+                        ?.firstOrNull { it.position == 1 }
+                        ?.rider
+                        .orEmpty()
+
+                    if (winner.isNotBlank()) {
+                        _state.update { current ->
+                            current.copy(raceWinners = current.raceWinners + (race.round to winner))
+                        }
+                    }
+                }
+            }
     }
 
     fun selectRace(race: Race) {
         _state.update { it.copy(selectedDetail = raceRepo.getRoundDetail(race)) }
     }
 
-    fun getResultForRace(race: Race): FirestoreResult? {
-        return _state.value.results.find {
-            it.raceName.equals(race.name, ignoreCase = true) ||
-            race.name.contains(it.raceName, ignoreCase = true) ||
-            it.raceName.contains(race.name, ignoreCase = true)
-        }
+    fun getRaceWinner(race: Race): String? {
+        return _state.value.raceWinners[race.round]
     }
 
     fun clearDetail() {
@@ -116,7 +129,7 @@ fun CalendarScreen(vm: CalendarViewModel = hiltViewModel()) {
                             modifier = Modifier.padding(vertical = 4.dp))
                     }
                     itemsIndexed(upcoming) { _, race ->
-                        RaceCard(race = race, result = null, onClick = { vm.selectRace(race) })
+                        RaceCard(race = race, raceWinner = null, onClick = { vm.selectRace(race) })
                     }
                 }
                 if (finished.isNotEmpty()) {
@@ -128,7 +141,7 @@ fun CalendarScreen(vm: CalendarViewModel = hiltViewModel()) {
                     itemsIndexed(finished) { _, race ->
                         RaceCard(
                             race = race,
-                            result = vm.getResultForRace(race),
+                            raceWinner = vm.getRaceWinner(race),
                             onClick = { vm.selectRace(race) }
                         )
                     }
@@ -145,7 +158,7 @@ fun CalendarScreen(vm: CalendarViewModel = hiltViewModel()) {
 }
 
 @Composable
-fun RaceCard(race: Race, result: FirestoreResult?, onClick: () -> Unit) {
+fun RaceCard(race: Race, raceWinner: String?, onClick: () -> Unit) {
     val statusColor = when (race.status) {
         "finished" -> MaterialTheme.colorScheme.outline
         "live"     -> MaterialTheme.colorScheme.error
@@ -182,25 +195,11 @@ fun RaceCard(race: Race, result: FirestoreResult?, onClick: () -> Unit) {
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                 }
             }
-            if (result != null) {
+            if (!raceWinner.isNullOrBlank()) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (result.sprintWinner.isNotEmpty()) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Sprint Podium", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
-                            Text("🥇 ${result.sprintWinner}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                            if (result.sprintSecond.isNotEmpty()) Text("🥈 ${result.sprintSecond}", style = MaterialTheme.typography.bodySmall)
-                            if (result.sprintThird.isNotEmpty()) Text("🥉 ${result.sprintThird}", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    if (result.raceWinner.isNotEmpty()) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Race Podium", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                            Text("🥇 ${result.raceWinner}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                            if (result.raceSecond.isNotEmpty()) Text("🥈 ${result.raceSecond}", style = MaterialTheme.typography.bodySmall)
-                            if (result.raceThird.isNotEmpty()) Text("🥉 ${result.raceThird}", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
+                Column {
+                    Text("Race Winner", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Text(raceWinner, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                 }
             } else if (race.status == "finished") {
                 Text("Results pending", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -210,11 +209,24 @@ fun RaceCard(race: Race, result: FirestoreResult?, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RoundDetailSheet(detail: RoundDetail) {
-    val sessionOrder = listOf("Practice 1","Practice 2","Sprint Qualifying","Sprint Race","Qualifying","Warm Up","Race")
+    var timeMode by remember { mutableStateOf(ScheduleTimeMode.LocalTime) }
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("EEE, dd MMM") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val selectedZone = when (timeMode) {
+        ScheduleTimeMode.YourTime -> ZoneId.systemDefault()
+        ScheduleTimeMode.LocalTime -> RaceWeekendSchedule.trackZone(detail.race)
+    }
+
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 40.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(detail.race.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -228,21 +240,43 @@ fun RoundDetailSheet(detail: RoundDetail) {
         }
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
         Text("Weekend Schedule", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        val sorted = detail.sessions.sortedBy { s -> sessionOrder.indexOf(s.type).let { if (it == -1) 99 else it } }
-        sorted.forEach { session ->
+
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = timeMode == ScheduleTimeMode.LocalTime,
+                onClick = { timeMode = ScheduleTimeMode.LocalTime },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                label = { Text("Local time") }
+            )
+            SegmentedButton(
+                selected = timeMode == ScheduleTimeMode.YourTime,
+                onClick = { timeMode = ScheduleTimeMode.YourTime },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                label = { Text("Your time") }
+            )
+        }
+
+        Text(selectedZone.id, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        detail.sessions.forEach { session ->
+            val start = when (timeMode) {
+                ScheduleTimeMode.YourTime -> RaceWeekendSchedule.sessionStartAtDevice(detail.race, session)
+                ScheduleTimeMode.LocalTime -> RaceWeekendSchedule.sessionStartAtTrack(detail.race, session)
+            }
+            val dateText = start?.format(dateFormatter) ?: session.date
+            val timeText = start?.format(timeFormatter) ?: session.time
             val (containerColor, contentColor) = when (session.type) {
                 "Race"             -> Pair(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
-                "Sprint Race"      -> Pair(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer)
-                "Qualifying", "Sprint Qualifying" -> Pair(MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
+                "Q1", "Q2"         -> Pair(MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
                 else               -> Pair(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = containerColor)) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(Modifier.weight(1f)) {
-                        Text(session.type, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = contentColor)
-                        Text(session.date, style = MaterialTheme.typography.bodySmall, color = contentColor.copy(alpha = 0.7f))
+                        Text(session.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = contentColor)
+                        Text(dateText, style = MaterialTheme.typography.bodySmall, color = contentColor.copy(alpha = 0.7f))
                     }
-                    Text(session.time, style = MaterialTheme.typography.labelLarge, color = contentColor)
+                    Text(timeText, style = MaterialTheme.typography.labelLarge, color = contentColor)
                 }
             }
         }

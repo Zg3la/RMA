@@ -1,16 +1,16 @@
 package com.motogp.fantasy.data.repository
 
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.motogp.fantasy.data.PREVIOUS_TEAM_SEASON
+import com.motogp.fantasy.data.teamDocumentId
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import java.text.Normalizer
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val SCORING_TAG = "FantasyScoringRepo"
 private const val FIRST_PLACE_POINTS = 7
 private const val SECOND_PLACE_POINTS = 4
 private const val THIRD_PLACE_POINTS = 2
@@ -67,17 +67,16 @@ class FantasyScoringRepo @Inject constructor(
             updateLeagueScores(uid, totalPoints)
             totalPoints
         } catch (e: Exception) {
-            Log.e(SCORING_TAG, "Score update failed: ${e.message}", e)
             0
         }
     }
 
     private suspend fun loadTeamRiderIds(uid: String): List<String> {
-        val currentSeasonTeam = db.collection("teams").document("${uid}_2026").get().await()
-        val team = if (currentSeasonTeam.exists()) {
-            currentSeasonTeam
+        val currentTeam = db.collection("teams").document(teamDocumentId(uid)).get().await()
+        val team = if (currentTeam.exists()) {
+            currentTeam
         } else {
-            db.collection("teams").document("${uid}_2025").get().await()
+            db.collection("teams").document(teamDocumentId(uid, PREVIOUS_TEAM_SEASON)).get().await()
         }
 
         return (team.get("riderIds") as? List<*>)

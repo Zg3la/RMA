@@ -2,7 +2,6 @@ package com.motogp.fantasy.di
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.storage.FirebaseStorage
 import com.motogp.fantasy.BuildConfig
 import com.motogp.fantasy.data.remote.MotorsportApi
@@ -64,6 +63,5 @@ object AppModule {
 
     @Provides @Singleton fun auth(): FirebaseAuth = FirebaseAuth.getInstance()
     @Provides @Singleton fun firestore(): FirebaseFirestore = FirebaseFirestore.getInstance()
-    @Provides @Singleton fun messaging(): FirebaseMessaging = FirebaseMessaging.getInstance()
     @Provides @Singleton fun storage(): FirebaseStorage = FirebaseStorage.getInstance()
 }
