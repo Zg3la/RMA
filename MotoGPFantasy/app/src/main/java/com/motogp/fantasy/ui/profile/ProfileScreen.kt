@@ -10,59 +10,25 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
-import com.motogp.fantasy.BuildConfig
 import com.motogp.fantasy.data.model.User
 import com.motogp.fantasy.data.repository.AuthRepo
 import com.motogp.fantasy.data.repository.UserRepo
 import com.motogp.fantasy.ui.common.LoadingScreen
-import com.motogp.fantasy.service.MotoGpNotifier
-import com.motogp.fantasy.service.RaceNotificationScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private data class SimulatedNotification(
-    val buttonLabel: String,
-    val title: String,
-    val body: String
-)
-
-private val simulatedNotifications = listOf(
-    SimulatedNotification(
-        buttonLabel = "Simulate race start",
-        title = "Race starting soon",
-        body = "Grand Prix of Italy starts in 15 minutes."
-    ),
-    SimulatedNotification(
-        buttonLabel = "Simulate team lock",
-        title = "Team lock deadline",
-        body = "Your fantasy team locks in 30 minutes."
-    ),
-    SimulatedNotification(
-        buttonLabel = "Simulate rival overtake",
-        title = "Leaderboard update",
-        body = "A rival just moved ahead of you in your league."
-    ),
-    SimulatedNotification(
-        buttonLabel = "Simulate race result",
-        title = "Race results posted",
-        body = "Main race results are ready to view."
-    )
-)
-
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val userRepo: UserRepo,
-    private val authRepo: AuthRepo,
-    private val notificationScheduler: RaceNotificationScheduler
+    private val authRepo: AuthRepo
 ) : ViewModel() {
     val user: StateFlow<User?> = userRepo.currentUser()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -74,10 +40,6 @@ class ProfileViewModel @Inject constructor(
     fun signOut(onDone: () -> Unit) {
         viewModelScope.launch { authRepo.signOut(); onDone() }
     }
-
-    fun scheduleSimulatedNotification(title: String, body: String): Boolean {
-        return notificationScheduler.scheduleDebugNotification(title, body)
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,19 +48,6 @@ fun ProfileScreen(onSignOut: () -> Unit, vm: ProfileViewModel = hiltViewModel())
     val user by vm.user.collectAsStateWithLifecycle()
     val snack = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-
-    fun scheduleSimulatedNotification(notification: SimulatedNotification) {
-        if (!MotoGpNotifier.canPostNotifications(context)) {
-            scope.launch { snack.showSnackbar("Notifications are disabled") }
-            return
-        }
-
-        val scheduled = vm.scheduleSimulatedNotification(notification.title, notification.body)
-        scope.launch {
-            snack.showSnackbar(if (scheduled) "Simulation scheduled in 10 seconds" else "Simulation could not be scheduled")
-        }
-    }
 
     Scaffold(topBar = { TopAppBar(title = { Text("Profile") }) }, snackbarHost = { SnackbarHost(snack) }) { pad ->
         if (user == null) { LoadingScreen(); return@Scaffold }
@@ -144,22 +93,6 @@ fun ProfileScreen(onSignOut: () -> Unit, vm: ProfileViewModel = hiltViewModel())
                                 })
                             }
                             if (i < 3) HorizontalDivider(thickness=0.5.dp)
-                        }
-                        if (BuildConfig.DEBUG) {
-                            HorizontalDivider(thickness=0.5.dp)
-                            simulatedNotifications.forEachIndexed { index, notification ->
-                                TextButton(
-                                    onClick = { scheduleSimulatedNotification(notification) },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(Icons.Outlined.Notifications, null, Modifier.size(16.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(notification.buttonLabel)
-                                }
-                                if (index < simulatedNotifications.lastIndex) {
-                                    HorizontalDivider(thickness=0.5.dp)
-                                }
-                            }
                         }
                     }
                 }

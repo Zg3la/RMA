@@ -70,16 +70,6 @@ class RaceNotificationScheduler @Inject constructor(
         )
     }
 
-    fun scheduleDebugNotification(title: String, body: String): Boolean {
-        return enqueue(
-            uniqueName = "debug-${System.currentTimeMillis()}",
-            triggerAt = ZonedDateTime.now().plusSeconds(DEBUG_NOTIFICATION_DELAY_SECONDS),
-            title = title,
-            body = body,
-            remember = false
-        )
-    }
-
     private fun enqueue(
         uniqueName: String,
         triggerAt: ZonedDateTime,
@@ -170,6 +160,5 @@ class RaceNotificationScheduler @Inject constructor(
         private const val KEY_SCHEDULED_ALARMS = "scheduled_alarm_keys"
         private const val TEAM_LOCK_NOTICE_MINUTES_BEFORE = 30L
         private const val RACE_NOTICE_MINUTES_BEFORE = 15L
-        private const val DEBUG_NOTIFICATION_DELAY_SECONDS = 10L
     }
 }
