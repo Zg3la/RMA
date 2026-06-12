@@ -50,11 +50,6 @@ Open the MotoGPFantasy folder in Android Studio and run the app configuration.
 
 The project is intended to be run as a debug build. If Gradle asks for a JDK, use the Android Studio bundled JDK or JDK 17.
 
-To build from terminal on Windows:
-
-cd MotoGPFantasy
-.\gradlew.bat :app:assembleDebug
-
 The generated APK is located at:
 
 MotoGPFantasy/app/build/outputs/apk/debug/app-debug.apk
