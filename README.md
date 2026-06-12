@@ -26,7 +26,7 @@ The main idea is simple: a user signs in with Google, selects riders and a const
 - Hilt
 - Firebase Authentication
 - Firebase Firestore
-- Retrofit and OkHttp
+- Retrofit 
 - Gradle Kotlin DSL
 
 ## Project Structure
