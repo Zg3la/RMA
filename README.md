@@ -26,12 +26,3 @@ MotoGP Fantasy is an Android fantasy racing app built with Kotlin and Jetpack Co
 - Retrofit
 - Gradle Kotlin DSL
 
-## Setup
-
-Open the `MotoGPFantasy` folder in Android Studio and let Gradle sync.
-
-Create a `local.properties` file inside `MotoGPFantasy` with:
-
-```properties
-sdk.dir=C\:\\Users\\YourName\\AppData\\Local\\Android\\Sdk
-RAPIDAPI_KEY=your_rapidapi_key_here
